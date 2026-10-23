@@ -200,6 +200,8 @@ function handleSubmit() {
   padding: 1.25rem;
   z-index: 999;
   animation: fadeIn 0.2s ease-out;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-card {
@@ -350,6 +352,38 @@ textarea.form-control {
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .modal-backdrop {
+    padding: 0.65rem;
+  }
+  .modal-card {
+    max-height: 92vh;
+    border-radius: var(--radius-lg);
+  }
+  .modal-header {
+    padding: 1rem 1.15rem;
+  }
+  .modal-title {
+    font-size: 1.05rem;
+  }
+  .modal-body {
+    padding: 1.1rem;
+    gap: 0.85rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-footer {
+    padding: 0.25rem 0 0;
+    gap: 0.5rem;
+  }
+  .modal-footer .btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.88rem;
   }
 }
 </style>

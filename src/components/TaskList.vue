@@ -330,6 +330,8 @@ function getCategoryColor(category) {
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .task-meta-row {
@@ -520,5 +522,34 @@ function getCategoryColor(category) {
 @keyframes pulse-danger {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+@media (max-width: 640px) {
+  .task-card {
+    padding: 0.85rem 0.95rem;
+    gap: 0.75rem;
+    border-radius: var(--radius-md);
+  }
+  .task-title {
+    font-size: 0.92rem;
+  }
+  .task-meta-row {
+    gap: 0.35rem;
+  }
+  .cat-badge,
+  .priority-badge,
+  .deadline-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+  }
+  .task-notes {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+  }
+  .action-btn {
+    padding: 7px;
+    min-width: 32px;
+    min-height: 32px;
+  }
 }
 </style>

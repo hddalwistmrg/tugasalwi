@@ -79,6 +79,12 @@
   --cta-gradient-hover: linear-gradient(135deg, #059669 0%, #0891b2 100%);
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 1.5rem;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -91,12 +97,19 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Base custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
