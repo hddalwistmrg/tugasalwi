@@ -3,7 +3,6 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import TaskForm from "./components/TaskForm.vue";
 import TaskList from "./components/TaskList.vue";
 import TaskModal from "./components/TaskModal.vue";
-import FirebaseModal from "./components/FirebaseModal.vue";
 import {
   initFirebase,
   loginWithGoogle,
@@ -48,10 +47,9 @@ const sortBy = ref("deadline"); // deadline, priority, newest
 // Modals
 const isTaskModalOpen = ref(false);
 const taskBeingEdited = ref(null);
-const isFirebaseModalOpen = ref(false);
 
 // Firebase & User state
-const isCloudConnected = ref(false);
+const isCloudConnected = ref(true);
 const currentUser = ref(null);
 let unsubscribeTasks = null;
 let unsubscribeAuth = null;
@@ -273,10 +271,6 @@ function attachTaskSubscription() {
 
 // Auth Handlers
 async function handleLogin() {
-  if (!isCloudConnected.value) {
-    isFirebaseModalOpen.value = true;
-    return;
-  }
   try {
     const user = await loginWithGoogle();
     currentUser.value = user;
@@ -318,15 +312,6 @@ onUnmounted(() => {
 
         <!-- Right Controls -->
         <div class="nav-actions">
-          <!-- Firebase Settings (Subtle Gear) -->
-          <button
-            class="icon-button"
-            @click="isFirebaseModalOpen = true"
-            title="Pengaturan Database Firebase"
-          >
-            ⚙️
-          </button>
-
           <!-- Dark / Light Theme Toggle -->
           <button
             class="icon-button"
@@ -402,13 +387,6 @@ onUnmounted(() => {
             </svg>
             <span>Masuk dengan Google</span>
           </button>
-
-          <p class="login-footer-hint">
-            Belum menghubungkan database?
-            <button class="btn-text-link" @click="isFirebaseModalOpen = true">
-              Atur Koneksi Firebase
-            </button>
-          </p>
         </div>
       </section>
 
@@ -549,14 +527,6 @@ onUnmounted(() => {
       :task-to-edit="taskBeingEdited"
       @close="isTaskModalOpen = false"
       @save="handleSaveTask"
-    />
-
-    <FirebaseModal
-      :is-open="isFirebaseModalOpen"
-      :is-connected="isCloudConnected"
-      @close="isFirebaseModalOpen = false"
-      @reconnect="setupFirebase"
-      @sync-local="() => {}"
     />
   </div>
 </template>

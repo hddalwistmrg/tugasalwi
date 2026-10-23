@@ -1,5 +1,15 @@
-// Firebase service module with resilient fallback to localStorage
-// Supports environment variables (VITE_FIREBASE_*) and in-app config storage
+// Firebase service module for TaskFlow
+// Directly configured for taskflow-alwi
+
+export const firebaseConfig = {
+  apiKey: "AIzaSyCYzBVQQW0oFTRklLdiWWdn50v-zh70u8k",
+  authDomain: "taskflow-alwi.firebaseapp.com",
+  projectId: "taskflow-alwi",
+  storageBucket: "taskflow-alwi.firebasestorage.app",
+  messagingSenderId: "443041146143",
+  appId: "1:443041146143:web:f0023caa22f3b9841e3c2a",
+  measurementId: "G-Z3KQ06JC7L"
+};
 
 let app = null;
 let db = null;
@@ -8,53 +18,8 @@ let googleProvider = null;
 let firestoreModules = null;
 let authModules = null;
 
-const STORAGE_KEY = "taskflow_firebase_config";
-
-export function getSavedConfig() {
-  const envConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
-  };
-
-  if (envConfig.apiKey && envConfig.projectId) {
-    return { ...envConfig, source: "env" };
-  }
-
+export async function initFirebase() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.apiKey && parsed.projectId) {
-        return { ...parsed, source: "local" };
-      }
-    }
-  } catch (e) {
-    console.warn("Gagal membaca saved Firebase config:", e);
-  }
-
-  return null;
-}
-
-export function saveConfig(config) {
-  if (!config) {
-    localStorage.removeItem(STORAGE_KEY);
-    return;
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
-
-export async function initFirebase(customConfig = null) {
-  const config = customConfig || getSavedConfig();
-  if (!config || !config.apiKey || !config.projectId) {
-    return { initialized: false, reason: "Konfigurasi Firebase belum diisi." };
-  }
-
-  try {
-    // Gunakan official Firebase ESM CDN dengan @vite-ignore agar tidak error meskipun belum 'npm install firebase'
     const CDN_BASE = "https://www.gstatic.com/firebasejs/10.12.0";
     
     const { initializeApp, getApps, getApp } = await import(
@@ -67,7 +32,7 @@ export async function initFirebase(customConfig = null) {
       /* @vite-ignore */ `${CDN_BASE}/firebase-auth.js`
     );
 
-    app = getApps().length ? getApp() : initializeApp(config);
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     db = firestoreModules.getFirestore(app);
     auth = authModules.getAuth(app);
     googleProvider = new authModules.GoogleAuthProvider();
@@ -83,10 +48,10 @@ export function isFirebaseReady() {
   return !!(db && firestoreModules);
 }
 
-// Auth helpers
+// Google Authentication
 export async function loginWithGoogle() {
   if (!auth || !authModules) {
-    throw new Error("Firebase Auth belum aktif. Silakan hubungkan Firebase terlebih dahulu.");
+    await initFirebase();
   }
   const result = await authModules.signInWithPopup(auth, googleProvider);
   return result.user;
@@ -105,21 +70,15 @@ export function onAuthChange(callback) {
   return authModules.onAuthStateChanged(auth, callback);
 }
 
-// Firestore Realtime Task helpers
+// Firestore Realtime Tasks scoped to logged in user
 export function subscribeToTasks(userId, onUpdate, onError) {
-  if (!db || !firestoreModules) {
+  if (!db || !firestoreModules || !userId) {
     return () => {};
   }
 
   const { collection, query, where, onSnapshot } = firestoreModules;
   const colRef = collection(db, "tasks");
-
-  let q;
-  if (userId) {
-    q = query(colRef, where("userId", "==", userId));
-  } else {
-    q = query(colRef);
-  }
+  const q = query(colRef, where("userId", "==", userId));
 
   return onSnapshot(
     q,
@@ -139,14 +98,14 @@ export function subscribeToTasks(userId, onUpdate, onError) {
   );
 }
 
-export async function syncTaskToCloud(task, userId = null) {
-  if (!db || !firestoreModules) return null;
+export async function syncTaskToCloud(task, userId) {
+  if (!db || !firestoreModules || !userId) return null;
   const { doc, setDoc } = firestoreModules;
   const taskId = task.id || crypto.randomUUID();
   const payload = {
     ...task,
     id: taskId,
-    userId: userId || null,
+    userId: userId,
     updatedAt: Date.now(),
     createdAt: task.createdAt || Date.now()
   };
