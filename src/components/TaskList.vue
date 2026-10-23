@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import LucideIcon from "./LucideIcon.vue";
 
 const props = defineProps({
   tasks: {
@@ -109,7 +110,8 @@ function getCategoryColor(category) {
           <div class="task-meta-row">
             <!-- Category Tag -->
             <span :class="['cat-badge', getCategoryColor(task.category)]">
-              🏷️ {{ task.category || "Umum" }}
+              <LucideIcon name="tag" size="13" />
+              <span>{{ task.category || "Umum" }}</span>
             </span>
 
             <!-- Priority Tag -->
@@ -118,21 +120,24 @@ function getCategoryColor(category) {
               class="priority-badge priority-high"
               title="Prioritas Tinggi"
             >
-              🔥 Tinggi
+              <LucideIcon name="alert-triangle" size="13" />
+              <span>Tinggi</span>
             </span>
             <span
               v-else-if="task.priority === 'low'"
               class="priority-badge priority-low"
               title="Prioritas Rendah"
             >
-              ☕ Rendah
+              <LucideIcon name="clock" size="13" />
+              <span>Rendah</span>
             </span>
             <span
               v-else
               class="priority-badge priority-medium"
               title="Prioritas Sedang"
             >
-              ⚡ Sedang
+              <LucideIcon name="zap" size="13" />
+              <span>Sedang</span>
             </span>
 
             <!-- Deadline Badge -->
@@ -141,13 +146,15 @@ function getCategoryColor(category) {
               :class="['deadline-badge', getDeadlineMeta(task.deadline)?.badgeClass]"
               :title="'Deadline: ' + getDeadlineMeta(task.deadline)?.detail"
             >
-              ⏰ {{ getDeadlineMeta(task.deadline)?.label }}
+              <LucideIcon name="calendar" size="13" />
+              <span>{{ getDeadlineMeta(task.deadline)?.label }}</span>
             </span>
           </div>
 
           <!-- Extra Notes if present -->
           <p v-if="task.notes" class="task-notes">
-            💬 {{ task.notes }}
+            <LucideIcon name="file-text" size="13" class="note-icon" />
+            <span>{{ task.notes }}</span>
           </p>
         </div>
 
@@ -204,7 +211,9 @@ function getCategoryColor(category) {
 
     <!-- Empty State -->
     <div v-if="tasks.length === 0" class="empty-state-box">
-      <div class="empty-icon">🎉</div>
+      <div class="empty-icon-wrapper">
+        <LucideIcon name="check-circle-2" size="32" stroke-width="1.8" />
+      </div>
       <h3 class="empty-title">Tidak ada tugas yang cocok</h3>
       <p class="empty-desc">
         Semua tugas telah diselesaikan atau belum ada catatan tugas di filter ini.
@@ -334,9 +343,12 @@ function getCategoryColor(category) {
 .cat-badge {
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .cat-indigo { background: #e0e7ff; color: #4338ca; }
@@ -358,8 +370,11 @@ function getCategoryColor(category) {
 .priority-badge {
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .priority-high {
@@ -379,11 +394,11 @@ function getCategoryColor(category) {
 .deadline-badge {
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .badge-danger {
@@ -410,6 +425,14 @@ function getCategoryColor(category) {
   border-radius: var(--radius-sm);
   margin-top: 4px;
   word-break: break-word;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.note-icon {
+  margin-top: 2px;
+  color: var(--text-muted);
 }
 
 /* Actions */
@@ -452,9 +475,16 @@ function getCategoryColor(category) {
   margin-top: 1rem;
 }
 
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 0.75rem;
+.empty-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  margin: 0 auto 0.75rem;
 }
 
 .empty-title {

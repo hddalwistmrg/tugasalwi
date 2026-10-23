@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import TaskForm from "./components/TaskForm.vue";
 import TaskList from "./components/TaskList.vue";
 import TaskModal from "./components/TaskModal.vue";
+import LucideIcon from "./components/LucideIcon.vue";
 import {
   initFirebase,
   loginWithGoogle,
@@ -17,7 +17,7 @@ import {
 const isDarkMode = ref(
   localStorage.getItem("taskflow_theme") === "dark" ||
     (!localStorage.getItem("taskflow_theme") &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
+      window.matchMedia("(prefers-color-scheme: dark)").matches),
 );
 
 function toggleTheme() {
@@ -92,7 +92,10 @@ const filteredTasks = computed(() => {
       if (statusFilter.value === "Done" && !task.done) return false;
 
       // Category
-      if (selectedCategory.value !== "All" && task.category !== selectedCategory.value) {
+      if (
+        selectedCategory.value !== "All" &&
+        task.category !== selectedCategory.value
+      ) {
         return false;
       }
 
@@ -114,7 +117,8 @@ const filteredTasks = computed(() => {
       }
 
       if (sortBy.value === "deadline") {
-        if (!a.deadline && !b.deadline) return (b.createdAt || 0) - (a.createdAt || 0);
+        if (!a.deadline && !b.deadline)
+          return (b.createdAt || 0) - (a.createdAt || 0);
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
         return new Date(a.deadline) - new Date(b.deadline);
@@ -174,7 +178,9 @@ async function handleSaveTask(payload) {
 
   if (taskBeingEdited.value) {
     // Edit existing
-    const index = tasks.value.findIndex((t) => t.id === taskBeingEdited.value.id);
+    const index = tasks.value.findIndex(
+      (t) => t.id === taskBeingEdited.value.id,
+    );
     if (index !== -1) {
       const updated = {
         ...tasks.value[index],
@@ -265,7 +271,7 @@ function attachTaskSubscription() {
     },
     (err) => {
       console.warn("Realtime sync issue:", err);
-    }
+    },
   );
 }
 
@@ -298,216 +304,246 @@ onUnmounted(() => {
 
 <template>
   <div class="app-layout">
-    <!-- Navbar Header -->
-    <header class="navbar">
-      <div class="nav-container">
-        <!-- Brand Logo -->
-        <div class="brand">
-          <div class="brand-icon">✨</div>
-          <div class="brand-text">
+    <!-- Main Container (Navbar has been removed) -->
+    <main class="main-content">
+      <!-- 1. TAMPILAN JIKA BELUM LOGIN (CLEAN CENTERED LANDING) -->
+      <section v-if="!currentUser" class="login-landing">
+        <!-- Landing Top Bar: Logo TaskFlow di atas paling kiri, Switcher Tema di kanan -->
+        <header class="landing-topbar">
+          <div class="brand">
+            <div class="brand-icon">
+              <LucideIcon name="check" size="18" stroke-width="3" />
+            </div>
             <span class="brand-name">TaskFlow</span>
-            <span class="brand-tag">Catatan Tugas Pribadi</span>
           </div>
-        </div>
 
-        <!-- Right Controls -->
-        <div class="nav-actions">
-          <!-- Dark / Light Theme Toggle -->
           <button
             class="icon-button"
             @click="toggleTheme"
             :title="isDarkMode ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'"
           >
-            <span v-if="isDarkMode">☀️</span>
-            <span v-else>🌙</span>
+            <LucideIcon v-if="isDarkMode" name="sun" size="18" />
+            <LucideIcon v-else name="moon" size="18" />
           </button>
+        </header>
 
-          <!-- User Menu if Logged In -->
-          <div v-if="currentUser" class="user-menu">
-            <img
-              v-if="currentUser.photoURL"
-              :src="currentUser.photoURL"
-              :alt="currentUser.displayName || 'User'"
-              class="user-avatar"
-            />
-            <span class="user-name">{{ currentUser.displayName?.split(" ")[0] || "Saya" }}</span>
-            <button class="btn-logout" @click="handleLogout" title="Keluar akun">
-              Keluar 🚪
-            </button>
+        <div class="landing-hero-center">
+          <!-- Minimalist Badge -->
+          <div class="hero-tag-badge">
+            <span class="badge-status-dot"></span>
+            <span>Manajemen Tugas Personal</span>
           </div>
-        </div>
-      </div>
-    </header>
 
-    <!-- Main Container -->
-    <main class="main-content">
-      <!-- 1. TAMPILAN JIKA BELUM LOGIN (LOGIN GATE) -->
-      <section v-if="!currentUser" class="login-gate">
-        <div class="login-card">
-          <div class="login-badge">🔒 Akses Pribadi</div>
-          <h2 class="login-title">Catatan Tugas Pribadi Anda</h2>
-          <p class="login-description">
-            Silakan masuk dengan akun Google Anda untuk mengakses, mencatat, mengatur prioritas tugas, dan menyinkronkan data secara otomatis ke cloud database.
+          <!-- Main Heading -->
+          <h1 class="hero-main-title">
+            Fokus pada hal penting.<br />Selesaikan tugas tepat waktu.
+          </h1>
+
+          <!-- Subtitle -->
+          <p class="hero-main-desc">
+            Ruang kerja minimalis untuk mencatat tugas, mengatur prioritas, dan memantau tenggat waktu tanpa distraksi.
           </p>
 
-          <div class="feature-pills">
-            <div class="pill-item">
-              <span class="pill-icon">☁️</span>
-              <span>Cloud Realtime (Firebase)</span>
-            </div>
-            <div class="pill-item">
-              <span class="pill-icon">⏰</span>
-              <span>Pengingat Deadline Warna</span>
-            </div>
-            <div class="pill-item">
-              <span class="pill-icon">🛡️</span>
-              <span>100% Privat & Aman</span>
-            </div>
+          <!-- Clean Primary CTA -->
+          <div class="hero-cta-group">
+            <button class="btn-cta-primary" @click="handleLogin">
+              <svg class="google-icon-btn" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>Masuk dengan Google</span>
+              <LucideIcon name="arrow-right" size="18" />
+            </button>
           </div>
-
-          <!-- Big Login Button -->
-          <button class="btn-login-big" @click="handleLogin">
-            <svg class="google-icon" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>Masuk dengan Google</span>
-          </button>
         </div>
       </section>
 
       <!-- 2. TAMPILAN JIKA SUDAH LOGIN (DASHBOARD LENGKAP) -->
       <section v-else class="dashboard">
-        <!-- Greeting & Header Banner -->
-        <section class="hero-section">
-          <div class="hero-text">
-            <h1 class="hero-title">
-              Halo, {{ currentUser.displayName?.split(" ")[0] || "Alwi" }}! 👋
-            </h1>
-            <p class="hero-subtitle">
-              Kelola tugas kuliah, catatan penting, dan deadline dengan rapi & produktif.
-            </p>
-          </div>
-
-          <button class="btn-create-large" @click="openCreateModal">
-            <span class="btn-icon">+</span>
-            <span>Buat Tugas Baru</span>
-          </button>
-        </section>
-
-        <!-- Stats Cards -->
-        <section class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon-wrapper stat-indigo">📝</div>
-            <div class="stat-details">
-              <span class="stat-number">{{ totalCount }}</span>
-              <span class="stat-name">Total Tugas</span>
+        <!-- Top Executive Bar with Brand, Theme, User Profile & Actions -->
+        <section class="dashboard-topbar">
+          <div class="brand">
+            <div class="brand-icon">
+              <LucideIcon name="check" size="18" stroke-width="3" />
             </div>
+            <span class="brand-name">TaskFlow</span>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-icon-wrapper stat-teal">⚡</div>
-            <div class="stat-details">
-              <span class="stat-number">{{ activeCount }}</span>
-              <span class="stat-name">Dalam Pengerjaan</span>
-            </div>
-          </div>
+          <div class="dashboard-actions">
+            <!-- Theme Toggle -->
+            <button
+              class="icon-button"
+              @click="toggleTheme"
+              :title="isDarkMode ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'"
+            >
+              <LucideIcon v-if="isDarkMode" name="sun" size="17" />
+              <LucideIcon v-else name="moon" size="17" />
+            </button>
 
-          <div class="stat-card">
-            <div class="stat-icon-wrapper stat-green">✅</div>
-            <div class="stat-details">
-              <div class="stat-number-row">
-                <span class="stat-number">{{ doneCount }}</span>
-                <span class="stat-percent">{{ progressPercentage }}%</span>
+            <!-- User Badge -->
+            <div class="user-pill">
+              <img
+                v-if="currentUser.photoURL"
+                :src="currentUser.photoURL"
+                :alt="currentUser.displayName || 'User'"
+                class="user-avatar"
+              />
+              <div v-else class="user-avatar-placeholder">
+                <LucideIcon name="user" size="15" />
               </div>
-              <span class="stat-name">Selesai</span>
+              <span class="user-name">{{
+                currentUser.displayName?.split(" ")[0] || "Saya"
+              }}</span>
             </div>
-            <!-- Progress bar -->
-            <div class="progress-track">
-              <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-            </div>
-          </div>
 
-          <div class="stat-card">
-            <div class="stat-icon-wrapper stat-red">🚨</div>
-            <div class="stat-details">
-              <span class="stat-number">{{ urgentCount }}</span>
-              <span class="stat-name">Mendekati Deadline</span>
-            </div>
+            <!-- Logout Button -->
+            <button
+              class="btn-logout"
+              @click="handleLogout"
+              title="Keluar akun"
+            >
+              <LucideIcon name="log-out" size="14" />
+              <span>Keluar</span>
+            </button>
+
+            <!-- Primary Create Button -->
+            <button class="btn-create-task" @click="openCreateModal">
+              <LucideIcon name="plus" size="18" />
+              <span>Tambah Tugas</span>
+            </button>
           </div>
         </section>
 
-        <!-- Quick Add Form -->
-        <TaskForm @add-task="handleAddTask" @open-modal="openCreateModal" />
+        <!-- Greeting & Subtitle Summary -->
+        <section class="dashboard-intro">
+          <h1 class="header-title">
+            Halo, {{ currentUser.displayName?.split(" ")[0] || "Saya" }}
+          </h1>
+          <p class="header-subtitle">
+            {{ activeCount > 0 ? `${activeCount} tugas aktif menunggu diselesaikan.` : 'Semua tugas telah selesai, kerja bagus!' }}
+          </p>
+        </section>
 
-        <!-- Filters, Search & View Controls -->
-        <section class="controls-bar">
+        <!-- Executive Minimalist Metric Ribbon -->
+        <section class="stats-ribbon">
+          <div class="ribbon-col">
+            <span class="ribbon-label">Total Tugas</span>
+            <span class="ribbon-value">{{ totalCount }}</span>
+          </div>
+
+          <div class="ribbon-divider"></div>
+
+          <div class="ribbon-col">
+            <div class="label-with-dot">
+              <span class="active-pulse-dot"></span>
+              <span class="ribbon-label">Dalam Pengerjaan</span>
+            </div>
+            <span class="ribbon-value text-teal">{{ activeCount }}</span>
+          </div>
+
+          <div class="ribbon-divider"></div>
+
+          <div class="ribbon-col">
+            <div class="label-with-percent">
+              <span class="ribbon-label">Selesai</span>
+              <span class="ribbon-percent">{{ progressPercentage }}%</span>
+            </div>
+            <div class="ribbon-progress-bar">
+              <div
+                class="ribbon-progress-fill"
+                :style="{ width: progressPercentage + '%' }"
+              ></div>
+            </div>
+          </div>
+
+          <div class="ribbon-divider"></div>
+
+          <div class="ribbon-col">
+            <span class="ribbon-label">Mendekati Deadline</span>
+            <span :class="['ribbon-value', urgentCount > 0 ? 'text-danger' : 'text-muted']">
+              {{ urgentCount }}
+            </span>
+          </div>
+        </section>
+
+        <!-- Filters, Search & View Controls (Integrated Toolbar) -->
+        <section class="toolbar-section">
           <!-- Search Input -->
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <LucideIcon name="search" size="17" class="search-icon" />
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Cari tugas, catatan, atau mata kuliah..."
+              placeholder="Cari tugas atau catatan..."
               class="search-input"
             />
-            <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''">
-              &times;
+            <button
+              v-if="searchQuery"
+              class="clear-search"
+              @click="searchQuery = ''"
+              title="Hapus pencarian"
+            >
+              <LucideIcon name="x" size="15" />
             </button>
           </div>
 
-          <!-- Filter Pills & Selects -->
-          <div class="filter-group">
-            <!-- Status Switcher -->
-            <div class="status-tabs">
+          <!-- Filter Controls -->
+          <div class="toolbar-filters">
+            <!-- Segmented Status Tabs -->
+            <div class="segmented-tabs">
               <button
-                :class="['tab-btn', { active: statusFilter === 'All' }]"
+                :class="['seg-btn', { active: statusFilter === 'All' }]"
                 @click="statusFilter = 'All'"
               >
                 Semua
               </button>
               <button
-                :class="['tab-btn', { active: statusFilter === 'Active' }]"
+                :class="['seg-btn', { active: statusFilter === 'Active' }]"
                 @click="statusFilter = 'Active'"
               >
                 Aktif ({{ activeCount }})
               </button>
               <button
-                :class="['tab-btn', { active: statusFilter === 'Done' }]"
+                :class="['seg-btn', { active: statusFilter === 'Done' }]"
                 @click="statusFilter = 'Done'"
               >
                 Selesai ({{ doneCount }})
               </button>
             </div>
 
-            <!-- Category Dropdown -->
-            <select v-model="selectedCategory" class="select-filter">
-              <option value="All">Semua Kategori</option>
-              <option v-for="cat in availableCategories" :key="cat" :value="cat">
-                {{ cat }}
-              </option>
-            </select>
+            <!-- Category & Sort Dropdowns -->
+            <div class="filter-selects">
+              <select v-model="selectedCategory" class="select-pill">
+                <option value="All">Semua Kategori</option>
+                <option
+                  v-for="cat in availableCategories"
+                  :key="cat"
+                  :value="cat"
+                >
+                  {{ cat }}
+                </option>
+              </select>
 
-            <!-- Sort Dropdown -->
-            <select v-model="sortBy" class="select-filter">
-              <option value="deadline">⏰ Deadline Terdekat</option>
-              <option value="priority">🔥 Prioritas Tertinggi</option>
-              <option value="newest">🆕 Terbaru Ditambahkan</option>
-            </select>
+              <select v-model="sortBy" class="select-pill">
+                <option value="deadline">Deadline Terdekat</option>
+                <option value="priority">Prioritas Tertinggi</option>
+                <option value="newest">Terbaru Ditambahkan</option>
+              </select>
+            </div>
           </div>
         </section>
 
@@ -520,6 +556,46 @@ onUnmounted(() => {
         />
       </section>
     </main>
+
+    <!-- Footer (Hanya ditampilkan pada halaman login/landing, tidak di dashboard) -->
+    <footer v-if="!currentUser" class="app-footer">
+      <div class="footer-container">
+        <div class="footer-content">
+          <div class="footer-left">
+            <div class="footer-brand">
+              <div class="brand-icon-mini">
+                <LucideIcon name="check" size="14" stroke-width="3" />
+              </div>
+              <span class="footer-brand-title">TaskFlow</span>
+            </div>
+            <p class="footer-description">
+              Sistem manajemen tugas harian yang minimalis dan teratur untuk meningkatkan fokus, ketenangan kerja, dan produktivitas Anda.
+            </p>
+          </div>
+
+          <div class="footer-right">
+            <span class="footer-connect-label">Terhubung dengan kreator</span>
+            <a
+              href="https://instagram.com/hddalwistmrg"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="instagram-btn"
+              title="Instagram @hddalwistmrg"
+            >
+              <LucideIcon name="instagram" size="18" />
+              <span>@hddalwistmrg</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-bottom-bar">
+          <p class="footer-copyright">
+            &copy; {{ new Date().getFullYear() }} TaskFlow. Dibuat oleh <strong>Haddad Alwi Situmorang</strong>. All rights reserved.
+          </p>
+          <span class="footer-tagline">Fokus, tenang, dan selesaikan tepat waktu.</span>
+        </div>
+      </div>
+    </footer>
 
     <!-- Modals -->
     <TaskModal
@@ -536,69 +612,44 @@ onUnmounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-page);
+  background-image:
+    radial-gradient(circle at 18% 18%, rgba(16, 185, 129, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 82% 28%, rgba(6, 182, 212, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 55%);
+  background-attachment: fixed;
 }
 
-/* Navbar */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.nav-container {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 0.85rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
+/* Brand Component */
 .brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.65rem;
 }
 
 .brand-icon {
-  font-size: 1.5rem;
-  background: var(--primary-light);
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  color: #ffffff;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .brand-name {
   font-size: 1.15rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
 }
 
-.brand-tag {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.google-icon-btn {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
 }
 
 /* Icon button */
@@ -606,12 +657,12 @@ onUnmounted(() => {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -621,22 +672,33 @@ onUnmounted(() => {
   border-color: var(--border-focus);
 }
 
-/* User Menu */
-.user-menu {
+/* User Pill & Info */
+.user-pill {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: var(--bg-subtle);
-  padding: 4px 8px 4px 4px;
+  background: var(--bg-surface);
+  padding: 3px 10px 3px 4px;
   border-radius: 9999px;
   border: 1px solid var(--border);
 }
 
 .user-avatar {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+.user-avatar-placeholder {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .user-name {
@@ -649,11 +711,14 @@ onUnmounted(() => {
   background: var(--danger-bg);
   color: var(--danger);
   border: none;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 9999px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   transition: all 0.2s ease;
 }
 
@@ -663,285 +728,316 @@ onUnmounted(() => {
 
 /* Main Content */
 .main-content {
-  max-width: 980px;
+  max-width: 1140px;
   width: 100%;
   margin: 0 auto;
-  padding: 2.5rem 1.25rem 4rem;
+  padding: 2.5rem 1.5rem 4rem;
   flex: 1;
 }
 
-/* 1. Login Gate */
-.login-gate {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem 0;
-  min-height: 60vh;
-}
-
-.login-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 2.75rem 2rem;
-  max-width: 480px;
-  width: 100%;
-  text-align: center;
-  box-shadow: var(--card-shadow);
+/* 1. Login Landing Clean Centered */
+.login-landing {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  animation: slideUp 0.3s ease-out;
-}
-
-.login-badge {
-  background: var(--primary-light);
-  color: var(--primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  margin-bottom: 1rem;
-}
-
-.login-title {
-  font-size: 1.65rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin-bottom: 0.65rem;
-  letter-spacing: -0.02em;
-}
-
-.login-description {
-  font-size: 0.92rem;
-  color: var(--text-muted);
-  line-height: 1.6;
-  margin-bottom: 1.75rem;
-}
-
-.feature-pills {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
   width: 100%;
-  margin-bottom: 2rem;
+  padding-bottom: 3.5rem;
 }
 
-.pill-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  padding: 0.65rem 1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-align: left;
-}
-
-.pill-icon {
-  font-size: 1.15rem;
-}
-
-.btn-login-big {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  background: #ffffff;
-  color: #1f2937;
-  border: 1px solid #d1d5db;
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1.25rem;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
-}
-
-.btn-login-big:hover {
-  background: #f9fafb;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-}
-
-.google-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.login-footer-hint {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin-top: 1.5rem;
-}
-
-.btn-text-link {
-  background: transparent;
-  border: none;
-  color: var(--primary);
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0 2px;
-}
-
-/* 2. Dashboard */
-.hero-section {
+.landing-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
+  width: 100%;
+  margin-bottom: 4rem;
+}
+
+.landing-hero-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+  animation: slideUp 0.35s ease-out;
+}
+
+.hero-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  color: #10b981;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+[data-theme="dark"] .hero-tag-badge {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.badge-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.hero-main-title {
+  font-size: 3.4rem;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--text-primary);
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .hero-main-title {
+    font-size: 2.35rem;
+  }
+}
+
+.hero-main-desc {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 2.25rem;
+  max-width: 540px;
+}
+
+.hero-cta-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 2. Dashboard Top Bar & Intro */
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-intro {
+  margin-bottom: 1.75rem;
+}
+
+.btn-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 0.98rem;
+  font-weight: 750;
+  padding: 0.95rem 1.95rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.45);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -4px rgba(16, 185, 129, 0.6);
+  filter: brightness(1.05);
+}
+
+/* 2. Dashboard */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.75rem;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-.hero-title {
-  font-size: 1.85rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+.header-intro {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title {
+  font-size: 1.75rem;
+  font-weight: 850;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 
-.hero-subtitle {
-  font-size: 0.95rem;
-  color: var(--text-muted);
+.header-subtitle {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
 }
 
-.btn-create-large {
+.btn-create-task {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--primary);
-  color: #fff;
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  color: #ffffff;
   border: none;
   border-radius: var(--radius-md);
-  padding: 0.75rem 1.4rem;
-  font-size: 0.95rem;
-  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 750;
   cursor: pointer;
-  box-shadow: 0 4px 14px var(--primary-ring);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   transition: all 0.25s ease;
 }
 
-.btn-create-large:hover {
-  background: var(--primary-hover);
+.btn-create-task:hover {
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+  filter: brightness(1.05);
 }
 
-.btn-icon {
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-/* Stats Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.stat-card {
+/* Executive Minimalist Stats Ribbon */
+.stats-ribbon {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.15rem;
+  padding: 1.1rem 1.6rem;
   box-shadow: var(--card-shadow);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1.2fr auto 1fr;
   align-items: center;
-  gap: 1rem;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
 }
 
-.stat-icon-wrapper {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.35rem;
-  flex-shrink: 0;
+@media (max-width: 820px) {
+  .stats-ribbon {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+  .ribbon-divider {
+    display: none;
+  }
 }
 
-.stat-indigo { background: #e0e7ff; }
-.stat-teal { background: #ccfbf1; }
-.stat-green { background: #d1fae5; }
-.stat-red { background: #fee2e2; }
-
-[data-theme="dark"] .stat-indigo { background: rgba(99, 102, 241, 0.2); }
-[data-theme="dark"] .stat-teal { background: rgba(20, 184, 166, 0.2); }
-[data-theme="dark"] .stat-green { background: rgba(16, 185, 129, 0.2); }
-[data-theme="dark"] .stat-red { background: rgba(239, 68, 68, 0.2); }
-
-.stat-details {
+.ribbon-col {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
-.stat-number-row {
+.ribbon-divider {
+  width: 1px;
+  height: 38px;
+  background: var(--border);
+}
+
+.ribbon-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ribbon-value {
+  font-size: 1.55rem;
+  font-weight: 850;
+  line-height: 1;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+.text-teal {
+  color: #0d9488;
+}
+
+[data-theme="dark"] .text-teal {
+  color: #2dd4bf;
+}
+
+.text-danger {
+  color: #ef4444;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.label-with-dot {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
 }
 
-.stat-number {
-  font-size: 1.45rem;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--text-primary);
+.active-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0d9488;
+  box-shadow: 0 0 6px #0d9488;
 }
 
-.stat-percent {
+[data-theme="dark"] .active-pulse-dot {
+  background: #2dd4bf;
+  box-shadow: 0 0 8px #2dd4bf;
+}
+
+.label-with-percent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ribbon-percent {
   font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--success);
+  font-weight: 750;
+  color: #10b981;
 }
 
-.stat-name {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-top: 3px;
-}
-
-.progress-track {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
+.ribbon-progress-bar {
+  height: 6px;
   background: var(--bg-subtle);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 4px;
 }
 
-.progress-fill {
+.ribbon-progress-fill {
   height: 100%;
-  background: var(--success);
+  background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+  border-radius: 9999px;
   transition: width 0.4s ease;
 }
 
-/* Controls Bar */
-.controls-bar {
+/* Integrated Toolbar Section */
+.toolbar-section {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .search-box {
@@ -950,9 +1046,13 @@ onUnmounted(() => {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.65rem 1rem;
+  padding: 0.55rem 0.95rem;
   gap: 0.65rem;
   box-shadow: var(--card-shadow);
+  flex: 1;
+  min-width: 240px;
+  max-width: 380px;
+  transition: all 0.2s ease;
 }
 
 .search-box:focus-within {
@@ -961,8 +1061,8 @@ onUnmounted(() => {
 }
 
 .search-icon {
-  font-size: 1rem;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .search-input {
@@ -970,7 +1070,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   outline: none;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   color: var(--text-primary);
 }
 
@@ -982,82 +1082,227 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 1.25rem;
   cursor: pointer;
-  line-height: 1;
-}
-
-.filter-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  padding: 0;
+}
+
+.clear-search:hover {
+  color: var(--text-primary);
+}
+
+.toolbar-filters {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
 
-.status-tabs {
+.segmented-tabs {
   display: flex;
   background: var(--bg-subtle);
-  padding: 4px;
+  padding: 3px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
 }
 
-.tab-btn {
+.seg-btn {
   background: transparent;
   border: none;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 650;
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.tab-btn:hover {
+.seg-btn:hover {
   color: var(--text-primary);
 }
 
-.tab-btn.active {
+.seg-btn.active {
   background: var(--bg-surface);
-  color: var(--primary);
+  color: #10b981;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
-.select-filter {
+[data-theme="dark"] .seg-btn.active {
+  color: #34d399;
+}
+
+.filter-selects {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.select-pill {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.5rem 0.85rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 650;
   color: var(--text-secondary);
   outline: none;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.select-filter:focus {
+.select-pill:focus {
   border-color: var(--border-focus);
 }
 
 @keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
-@media (max-width: 640px) {
-  .filter-group {
+@media (max-width: 768px) {
+  .toolbar-section {
     flex-direction: column;
     align-items: stretch;
   }
-  .status-tabs {
-    width: 100%;
+  .search-box {
+    max-width: 100%;
+  }
+  .toolbar-filters {
     justify-content: space-between;
   }
-  .tab-btn {
-    flex: 1;
-    text-align: center;
-  }
+}
+
+/* Footer */
+.app-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  padding: 3rem 1.5rem 2.5rem;
+}
+
+.footer-container {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.footer-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 460px;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.brand-icon-mini {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  color: #ffffff;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-brand-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+.footer-description {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.footer-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.footer-connect-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.instagram-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.55rem 1.15rem;
+  border-radius: 9999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--card-shadow);
+  transition: all 0.25s ease;
+}
+
+.instagram-btn:hover {
+  border-color: #e1306c;
+  color: #e1306c;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(225, 48, 108, 0.2);
+}
+
+.footer-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.footer-copyright {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.footer-copyright strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.footer-tagline {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 </style>

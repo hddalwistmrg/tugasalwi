@@ -9,18 +9,20 @@ const props = defineProps({
 const emit = defineEmits(["close", "save"]);
 
 const DEFAULT_CATEGORIES = [
-  "Pemrograman Web",
-  "Basis Data",
-  "Jaringan Komputer",
-  "Algoritma & Struktur Data",
-  "Kalkulus / Matematika",
-  "Kecerdasan Buatan",
-  "Pribadi / Umum",
+  "Jaringan Syaraf Tiruan",
+  "Kerja Praktik",
+  "Komunikasi Data",
+  "Metode Numerik",
+  "Metodologi Penelitian",
+  "Pemodelan dan Simulasi",
+  "Pemrograman Berorientasi Objek",
+  "Pemrograman WEB",
+  "Sains dan Teknologi Lingkungan",
 ];
 
 const form = ref({
   title: "",
-  category: "Pemrograman Web",
+  category: "Jaringan Syaraf Tiruan",
   customCategory: "",
   priority: "medium", // high, medium, low
   deadline: "",
@@ -58,7 +60,7 @@ watch(
         isCustomCategory.value = false;
       }
     }
-  }
+  },
 );
 
 function onCategoryChange(e) {
@@ -76,8 +78,8 @@ function handleSubmit() {
     isCustomCategory.value && form.value.customCategory.trim()
       ? form.value.customCategory.trim()
       : form.value.category === "custom"
-      ? "Lainnya"
-      : form.value.category;
+        ? "Lainnya"
+        : form.value.category;
 
   emit("save", {
     title: form.value.title.trim(),
@@ -102,12 +104,14 @@ function handleSubmit() {
 
       <form @submit.prevent="handleSubmit" class="modal-body">
         <div class="form-group">
-          <label class="form-label">Judul Tugas <span class="required">*</span></label>
+          <label class="form-label"
+            >Judul Tugas <span class="required">*</span></label
+          >
           <input
             v-model="form.title"
             type="text"
             required
-            placeholder="Contoh: Laporan Praktikum Modul 4"
+            placeholder="Contoh: Publish Artikel Jurnal JST"
             class="form-control"
             autofocus
           />
@@ -121,11 +125,7 @@ function handleSubmit() {
               @change="onCategoryChange"
               class="form-control"
             >
-              <option
-                v-for="cat in DEFAULT_CATEGORIES"
-                :key="cat"
-                :value="cat"
-              >
+              <option v-for="cat in DEFAULT_CATEGORIES" :key="cat" :value="cat">
                 {{ cat }}
               </option>
               <option value="custom">+ Kategori Lainnya...</option>
@@ -135,9 +135,9 @@ function handleSubmit() {
           <div class="form-group">
             <label class="form-label">Prioritas</label>
             <select v-model="form.priority" class="form-control">
-              <option value="high">🔥 Tinggi (Mendesak)</option>
-              <option value="medium">⚡ Sedang (Normal)</option>
-              <option value="low">☕ Rendah (Santai)</option>
+              <option value="high">Tinggi (Mendesak)</option>
+              <option value="medium">Sedang (Normal)</option>
+              <option value="low">Rendah (Santai)</option>
             </select>
           </div>
         </div>
@@ -172,7 +172,11 @@ function handleSubmit() {
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="$emit('close')">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click="$emit('close')"
+          >
             Batal
           </button>
           <button type="submit" class="btn btn-primary">
@@ -330,12 +334,22 @@ textarea.form-control {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 </style>

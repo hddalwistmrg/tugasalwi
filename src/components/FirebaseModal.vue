@@ -113,7 +113,7 @@ function handleClear() {
 
       <div class="modal-body">
         <div class="info-box">
-          <div class="info-title">🚀 Cara Dapatkan Gratis 100% dari Firebase:</div>
+          <div class="info-title">Panduan Konfigurasi Firebase:</div>
           <ol class="info-steps">
             <li>Buka <b>console.firebase.google.com</b> (gratis dengan akun Google).</li>
             <li>Klik <b>Add Project</b>, lalu aktifkan <b>Firestore Database</b> & <b>Authentication (Google Provider)</b>.</li>
