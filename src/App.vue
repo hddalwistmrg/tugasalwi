@@ -1079,7 +1079,7 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .login-landing {
-    padding-bottom: 4.5rem;
+    padding-bottom: 12rem;
   }
 }
 
@@ -1093,7 +1093,7 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .landing-topbar {
-    margin-bottom: 2.5rem;
+    margin-bottom: 11rem;
   }
 }
 
@@ -1969,14 +1969,14 @@ onUnmounted(() => {
   margin-top: auto;
   border-top: 1px solid var(--border);
   background: transparent;
-  padding: 4.5rem 1.5rem 3rem;
+  padding: 3rem 1.5rem 2.5rem;
   position: relative;
   z-index: 1;
 }
 
 @media (max-width: 640px) {
   .app-footer {
-    padding: 3rem 1rem 2.25rem;
+    padding: 2.25rem 1rem 2rem;
   }
 }
 
