@@ -1,12 +1,11 @@
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import TaskForm from "./components/TaskForm.vue";
 import TaskList from "./components/TaskList.vue";
 import TaskModal from "./components/TaskModal.vue";
 import FirebaseModal from "./components/FirebaseModal.vue";
 import {
   initFirebase,
-  getSavedConfig,
   loginWithGoogle,
   logoutUser,
   onAuthChange,
@@ -36,10 +35,9 @@ function applyTheme() {
   }
 }
 
-// Tasks state
-const LOCAL_STORAGE_KEY = "tasks";
-const rawSaved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
-const tasks = ref(rawSaved);
+// Tasks state (strictly online when logged in)
+const tasks = ref([]);
+const isAuthLoading = ref(true);
 
 // Filters & Search
 const searchQuery = ref("");
@@ -138,6 +136,8 @@ const filteredTasks = computed(() => {
 
 // Task Actions
 async function handleAddTask(taskData) {
+  if (!currentUser.value) return;
+
   const newTask = {
     id: crypto.randomUUID(),
     title: taskData.title,
@@ -146,6 +146,7 @@ async function handleAddTask(taskData) {
     deadline: taskData.deadline || "",
     notes: taskData.notes || "",
     done: false,
+    userId: currentUser.value.uid,
     createdAt: Date.now(),
   };
 
@@ -153,9 +154,9 @@ async function handleAddTask(taskData) {
 
   if (isCloudConnected.value) {
     try {
-      await syncTaskToCloud(newTask, currentUser.value?.uid);
+      await syncTaskToCloud(newTask, currentUser.value.uid);
     } catch (e) {
-      console.warn("Gagal simpan ke cloud, tersimpan di local:", e);
+      console.error("Gagal simpan ke Firebase:", e);
     }
   }
 }
@@ -171,6 +172,8 @@ function openEditModal(task) {
 }
 
 async function handleSaveTask(payload) {
+  if (!currentUser.value) return;
+
   if (taskBeingEdited.value) {
     // Edit existing
     const index = tasks.value.findIndex((t) => t.id === taskBeingEdited.value.id);
@@ -184,9 +187,9 @@ async function handleSaveTask(payload) {
 
       if (isCloudConnected.value) {
         try {
-          await syncTaskToCloud(updated, currentUser.value?.uid);
+          await syncTaskToCloud(updated, currentUser.value.uid);
         } catch (e) {
-          console.warn("Gagal update cloud:", e);
+          console.error("Gagal update cloud:", e);
         }
       }
     }
@@ -200,11 +203,11 @@ async function toggleTask(id) {
   const task = tasks.value.find((item) => item.id === id);
   if (task) {
     task.done = !task.done;
-    if (isCloudConnected.value) {
+    if (isCloudConnected.value && currentUser.value) {
       try {
-        await syncTaskToCloud(task, currentUser.value?.uid);
+        await syncTaskToCloud(task, currentUser.value.uid);
       } catch (e) {
-        console.warn("Gagal sync toggle:", e);
+        console.error("Gagal sync toggle:", e);
       }
     }
   }
@@ -218,37 +221,15 @@ async function removeTask(id) {
       try {
         await deleteTaskFromCloud(id);
       } catch (e) {
-        console.warn("Gagal hapus dari cloud:", e);
+        console.error("Gagal hapus dari cloud:", e);
       }
     }
   }
 }
 
-// Sync all local tasks to Firebase Firestore
-async function syncLocalToCloud() {
-  if (!isCloudConnected.value) {
-    alert("Harap hubungkan Firebase terlebih dahulu.");
-    return;
-  }
-  let count = 0;
-  for (const t of tasks.value) {
-    await syncTaskToCloud(t, currentUser.value?.uid);
-    count++;
-  }
-  alert(`Berhasil mengunggah ${count} catatan tugas ke Cloud Firestore!`);
-}
-
-// Watch tasks and save to localStorage
-watch(
-  tasks,
-  (val) => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(val));
-  },
-  { deep: true }
-);
-
 // Firebase Initialization & Sync
 async function setupFirebase() {
+  isAuthLoading.value = true;
   if (unsubscribeTasks) unsubscribeTasks();
   if (unsubscribeAuth) unsubscribeAuth();
 
@@ -259,26 +240,33 @@ async function setupFirebase() {
     // Listen to Auth State
     unsubscribeAuth = onAuthChange((user) => {
       currentUser.value = user;
-      attachTaskSubscription();
+      isAuthLoading.value = false;
+      if (user) {
+        attachTaskSubscription();
+      } else {
+        tasks.value = [];
+        if (unsubscribeTasks) unsubscribeTasks();
+      }
     });
   } else {
     isCloudConnected.value = false;
+    currentUser.value = null;
+    isAuthLoading.value = false;
   }
 }
 
 function attachTaskSubscription() {
   if (unsubscribeTasks) unsubscribeTasks();
+  if (!currentUser.value) return;
 
-  const userId = currentUser.value ? currentUser.value.uid : null;
+  const userId = currentUser.value.uid;
   unsubscribeTasks = subscribeToTasks(
     userId,
     (cloudTasks) => {
-      if (cloudTasks && cloudTasks.length > 0) {
-        tasks.value = cloudTasks;
-      }
+      tasks.value = cloudTasks || [];
     },
     (err) => {
-      console.warn("Realtime sync issue, keeping local cache:", err);
+      console.warn("Realtime sync issue:", err);
     }
   );
 }
@@ -300,6 +288,7 @@ async function handleLogin() {
 async function handleLogout() {
   await logoutUser();
   currentUser.value = null;
+  tasks.value = [];
 }
 
 onMounted(() => {
@@ -329,17 +318,13 @@ onUnmounted(() => {
 
         <!-- Right Controls -->
         <div class="nav-actions">
-          <!-- Cloud Sync Badge / Button -->
+          <!-- Firebase Settings (Subtle Gear) -->
           <button
-            class="status-pill"
-            :class="{ 'is-cloud': isCloudConnected }"
+            class="icon-button"
             @click="isFirebaseModalOpen = true"
-            :title="isCloudConnected ? 'Terkoneksi ke Cloud Firestore' : 'Klik untuk hubungkan database online'"
+            title="Pengaturan Database Firebase"
           >
-            <span class="pulse-dot"></span>
-            <span class="status-label">
-              {{ isCloudConnected ? "Cloud Sync" : "Local Storage" }}
-            </span>
+            ⚙️
           </button>
 
           <!-- Dark / Light Theme Toggle -->
@@ -352,7 +337,7 @@ onUnmounted(() => {
             <span v-else>🌙</span>
           </button>
 
-          <!-- Google Auth User / Login Button -->
+          <!-- User Menu if Logged In -->
           <div v-if="currentUser" class="user-menu">
             <img
               v-if="currentUser.photoURL"
@@ -362,15 +347,41 @@ onUnmounted(() => {
             />
             <span class="user-name">{{ currentUser.displayName?.split(" ")[0] || "Saya" }}</span>
             <button class="btn-logout" @click="handleLogout" title="Keluar akun">
-              🚪
+              Keluar 🚪
             </button>
           </div>
-          <button
-            v-else
-            class="btn-login-google"
-            @click="handleLogin"
-            title="Masuk dengan Google agar catatan tersinkron ke semua perangkat"
-          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      <!-- 1. TAMPILAN JIKA BELUM LOGIN (LOGIN GATE) -->
+      <section v-if="!currentUser" class="login-gate">
+        <div class="login-card">
+          <div class="login-badge">🔒 Akses Pribadi</div>
+          <h2 class="login-title">Catatan Tugas Pribadi Anda</h2>
+          <p class="login-description">
+            Silakan masuk dengan akun Google Anda untuk mengakses, mencatat, mengatur prioritas tugas, dan menyinkronkan data secara otomatis ke cloud database.
+          </p>
+
+          <div class="feature-pills">
+            <div class="pill-item">
+              <span class="pill-icon">☁️</span>
+              <span>Cloud Realtime (Firebase)</span>
+            </div>
+            <div class="pill-item">
+              <span class="pill-icon">⏰</span>
+              <span>Pengingat Deadline Warna</span>
+            </div>
+            <div class="pill-item">
+              <span class="pill-icon">🛡️</span>
+              <span>100% Privat & Aman</span>
+            </div>
+          </div>
+
+          <!-- Big Login Button -->
+          <button class="btn-login-big" @click="handleLogin">
             <svg class="google-icon" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
@@ -389,140 +400,147 @@ onUnmounted(() => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span class="btn-login-text">Masuk</span>
+            <span>Masuk dengan Google</span>
           </button>
-        </div>
-      </div>
-    </header>
 
-    <!-- Main Container -->
-    <main class="main-content">
-      <!-- Greeting & Header Banner -->
-      <section class="hero-section">
-        <div class="hero-text">
-          <h1 class="hero-title">
-            {{ currentUser ? `Halo, ${currentUser.displayName?.split(" ")[0]}! 👋` : "Halo, Alwi! 👋" }}
-          </h1>
-          <p class="hero-subtitle">
-            Kelola tugas kuliah, catatan penting, dan deadline dengan rapi & produktif.
+          <p class="login-footer-hint">
+            Belum menghubungkan database?
+            <button class="btn-text-link" @click="isFirebaseModalOpen = true">
+              Atur Koneksi Firebase
+            </button>
           </p>
         </div>
-
-        <button class="btn-create-large" @click="openCreateModal">
-          <span class="btn-icon">+</span>
-          <span>Buat Tugas Baru</span>
-        </button>
       </section>
 
-      <!-- Stats Cards -->
-      <section class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon-wrapper stat-indigo">📝</div>
-          <div class="stat-details">
-            <span class="stat-number">{{ totalCount }}</span>
-            <span class="stat-name">Total Tugas</span>
+      <!-- 2. TAMPILAN JIKA SUDAH LOGIN (DASHBOARD LENGKAP) -->
+      <section v-else class="dashboard">
+        <!-- Greeting & Header Banner -->
+        <section class="hero-section">
+          <div class="hero-text">
+            <h1 class="hero-title">
+              Halo, {{ currentUser.displayName?.split(" ")[0] || "Alwi" }}! 👋
+            </h1>
+            <p class="hero-subtitle">
+              Kelola tugas kuliah, catatan penting, dan deadline dengan rapi & produktif.
+            </p>
           </div>
-        </div>
 
-        <div class="stat-card">
-          <div class="stat-icon-wrapper stat-teal">⚡</div>
-          <div class="stat-details">
-            <span class="stat-number">{{ activeCount }}</span>
-            <span class="stat-name">Dalam Pengerjaan</span>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon-wrapper stat-green">✅</div>
-          <div class="stat-details">
-            <div class="stat-number-row">
-              <span class="stat-number">{{ doneCount }}</span>
-              <span class="stat-percent">{{ progressPercentage }}%</span>
-            </div>
-            <span class="stat-name">Selesai</span>
-          </div>
-          <!-- Progress bar -->
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon-wrapper stat-red">🚨</div>
-          <div class="stat-details">
-            <span class="stat-number">{{ urgentCount }}</span>
-            <span class="stat-name">Mendekati Deadline</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Quick Add Form -->
-      <TaskForm @add-task="handleAddTask" @open-modal="openCreateModal" />
-
-      <!-- Filters, Search & View Controls -->
-      <section class="controls-bar">
-        <!-- Search Input -->
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Cari tugas, catatan, atau mata kuliah..."
-            class="search-input"
-          />
-          <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''">
-            &times;
+          <button class="btn-create-large" @click="openCreateModal">
+            <span class="btn-icon">+</span>
+            <span>Buat Tugas Baru</span>
           </button>
-        </div>
+        </section>
 
-        <!-- Filter Pills & Selects -->
-        <div class="filter-group">
-          <!-- Status Switcher -->
-          <div class="status-tabs">
-            <button
-              :class="['tab-btn', { active: statusFilter === 'All' }]"
-              @click="statusFilter = 'All'"
-            >
-              Semua
-            </button>
-            <button
-              :class="['tab-btn', { active: statusFilter === 'Active' }]"
-              @click="statusFilter = 'Active'"
-            >
-              Aktif ({{ activeCount }})
-            </button>
-            <button
-              :class="['tab-btn', { active: statusFilter === 'Done' }]"
-              @click="statusFilter = 'Done'"
-            >
-              Selesai ({{ doneCount }})
+        <!-- Stats Cards -->
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrapper stat-indigo">📝</div>
+            <div class="stat-details">
+              <span class="stat-number">{{ totalCount }}</span>
+              <span class="stat-name">Total Tugas</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper stat-teal">⚡</div>
+            <div class="stat-details">
+              <span class="stat-number">{{ activeCount }}</span>
+              <span class="stat-name">Dalam Pengerjaan</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper stat-green">✅</div>
+            <div class="stat-details">
+              <div class="stat-number-row">
+                <span class="stat-number">{{ doneCount }}</span>
+                <span class="stat-percent">{{ progressPercentage }}%</span>
+              </div>
+              <span class="stat-name">Selesai</span>
+            </div>
+            <!-- Progress bar -->
+            <div class="progress-track">
+              <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper stat-red">🚨</div>
+            <div class="stat-details">
+              <span class="stat-number">{{ urgentCount }}</span>
+              <span class="stat-name">Mendekati Deadline</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Add Form -->
+        <TaskForm @add-task="handleAddTask" @open-modal="openCreateModal" />
+
+        <!-- Filters, Search & View Controls -->
+        <section class="controls-bar">
+          <!-- Search Input -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Cari tugas, catatan, atau mata kuliah..."
+              class="search-input"
+            />
+            <button v-if="searchQuery" class="clear-search" @click="searchQuery = ''">
+              &times;
             </button>
           </div>
 
-          <!-- Category Dropdown -->
-          <select v-model="selectedCategory" class="select-filter">
-            <option value="All">Semua Kategori</option>
-            <option v-for="cat in availableCategories" :key="cat" :value="cat">
-              {{ cat }}
-            </option>
-          </select>
+          <!-- Filter Pills & Selects -->
+          <div class="filter-group">
+            <!-- Status Switcher -->
+            <div class="status-tabs">
+              <button
+                :class="['tab-btn', { active: statusFilter === 'All' }]"
+                @click="statusFilter = 'All'"
+              >
+                Semua
+              </button>
+              <button
+                :class="['tab-btn', { active: statusFilter === 'Active' }]"
+                @click="statusFilter = 'Active'"
+              >
+                Aktif ({{ activeCount }})
+              </button>
+              <button
+                :class="['tab-btn', { active: statusFilter === 'Done' }]"
+                @click="statusFilter = 'Done'"
+              >
+                Selesai ({{ doneCount }})
+              </button>
+            </div>
 
-          <!-- Sort Dropdown -->
-          <select v-model="sortBy" class="select-filter">
-            <option value="deadline">⏰ Deadline Terdekat</option>
-            <option value="priority">🔥 Prioritas Tertinggi</option>
-            <option value="newest">🆕 Terbaru Ditambahkan</option>
-          </select>
-        </div>
+            <!-- Category Dropdown -->
+            <select v-model="selectedCategory" class="select-filter">
+              <option value="All">Semua Kategori</option>
+              <option v-for="cat in availableCategories" :key="cat" :value="cat">
+                {{ cat }}
+              </option>
+            </select>
+
+            <!-- Sort Dropdown -->
+            <select v-model="sortBy" class="select-filter">
+              <option value="deadline">⏰ Deadline Terdekat</option>
+              <option value="priority">🔥 Prioritas Tertinggi</option>
+              <option value="newest">🆕 Terbaru Ditambahkan</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Task List Component -->
+        <TaskList
+          :tasks="filteredTasks"
+          @toggle-task="toggleTask"
+          @remove-task="removeTask"
+          @edit-task="openEditModal"
+        />
       </section>
-
-      <!-- Task List Component -->
-      <TaskList
-        :tasks="filteredTasks"
-        @toggle-task="toggleTask"
-        @remove-task="removeTask"
-        @edit-task="openEditModal"
-      />
     </main>
 
     <!-- Modals -->
@@ -538,7 +556,7 @@ onUnmounted(() => {
       :is-connected="isCloudConnected"
       @close="isFirebaseModalOpen = false"
       @reconnect="setupFirebase"
-      @sync-local="syncLocalToCloud"
+      @sync-local="() => {}"
     />
   </div>
 </template>
@@ -613,54 +631,17 @@ onUnmounted(() => {
   gap: 0.75rem;
 }
 
-/* Status Pill */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0.4rem 0.8rem;
-  border-radius: 9999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
-}
-
-.status-pill:hover {
-  border-color: var(--border-focus);
-}
-
-.status-pill.is-cloud {
-  background: var(--success-bg);
-  color: var(--success);
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-.pulse-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--warning);
-}
-
-.status-pill.is-cloud .pulse-dot {
-  background: var(--success);
-}
-
 /* Icon button */
 .icon-button {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -670,62 +651,44 @@ onUnmounted(() => {
   border-color: var(--border-focus);
 }
 
-/* Google Login / User */
-.btn-login-google {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.4rem 0.75rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--text-primary);
-  transition: all 0.2s ease;
-}
-
-.btn-login-google:hover {
-  background: var(--bg-subtle);
-  border-color: var(--border-focus);
-}
-
-.google-icon {
-  width: 16px;
-  height: 16px;
-}
-
+/* User Menu */
 .user-menu {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.6rem;
   background: var(--bg-subtle);
-  padding: 3px 6px 3px 3px;
+  padding: 4px 8px 4px 4px;
   border-radius: 9999px;
   border: 1px solid var(--border);
 }
 
 .user-avatar {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .user-name {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--text-primary);
-  padding-right: 4px;
 }
 
 .btn-logout {
-  background: transparent;
+  background: var(--danger-bg);
+  color: var(--danger);
   border: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 9999px;
   cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  filter: brightness(0.9);
 }
 
 /* Main Content */
@@ -733,11 +696,131 @@ onUnmounted(() => {
   max-width: 980px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
+  padding: 2.5rem 1.25rem 4rem;
   flex: 1;
 }
 
-/* Hero Section */
+/* 1. Login Gate */
+.login-gate {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 0;
+  min-height: 60vh;
+}
+
+.login-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 2.75rem 2rem;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: slideUp 0.3s ease-out;
+}
+
+.login-badge {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  margin-bottom: 1rem;
+}
+
+.login-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.65rem;
+  letter-spacing: -0.02em;
+}
+
+.login-description {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 1.75rem;
+}
+
+.feature-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.pill-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.pill-icon {
+  font-size: 1.15rem;
+}
+
+.btn-login-big {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.btn-login-big:hover {
+  background: #f9fafb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.login-footer-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 1.5rem;
+}
+
+.btn-text-link {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0 2px;
+}
+
+/* 2. Dashboard */
 .hero-section {
   display: flex;
   align-items: center;
@@ -779,7 +862,6 @@ onUnmounted(() => {
 .btn-create-large:hover {
   background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px var(--primary-ring);
 }
 
 .btn-icon {
@@ -813,11 +895,6 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-focus);
 }
 
 .stat-icon-wrapper {
@@ -906,7 +983,6 @@ onUnmounted(() => {
   padding: 0.65rem 1rem;
   gap: 0.65rem;
   box-shadow: var(--card-shadow);
-  transition: all 0.2s ease;
 }
 
 .search-box:focus-within {
@@ -989,17 +1065,18 @@ onUnmounted(() => {
   color: var(--text-secondary);
   outline: none;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .select-filter:focus {
   border-color: var(--border-focus);
 }
 
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 @media (max-width: 640px) {
-  .btn-login-text {
-    display: none;
-  }
   .filter-group {
     flex-direction: column;
     align-items: stretch;

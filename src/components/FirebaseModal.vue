@@ -79,7 +79,7 @@ function handleSave() {
 }
 
 function handleClear() {
-  if (confirm("Hapus konfigurasi Firebase dan kembali ke mode Local Storage?")) {
+  if (confirm("Hapus konfigurasi Firebase?")) {
     saveConfig(null);
     config.value = {
       apiKey: "",
@@ -104,7 +104,7 @@ function handleClear() {
           <p class="modal-subtitle">
             Status:
             <span :class="['badge', isConnected ? 'badge-success' : 'badge-warning']">
-              {{ isConnected ? "Terkoneksi ke Cloud" : "Mode Offline (Local Storage)" }}
+              {{ isConnected ? "Terkoneksi ke Cloud" : "Belum Terhubung" }}
             </span>
           </p>
         </div>
@@ -156,16 +156,6 @@ function handleClear() {
             <label class="form-label">App ID</label>
             <input v-model="config.appId" type="text" class="form-control" placeholder="1:12345:web:..." />
           </div>
-        </div>
-
-        <div v-if="isConnected" class="sync-banner">
-          <div>
-            <b>Sinkronisasi Data Lokal</b>
-            <p>Upload data catatan yang saat ini ada di komputer ke Cloud Database Firebase.</p>
-          </div>
-          <button type="button" @click="$emit('sync-local')" class="btn btn-primary-light">
-            Upload ke Cloud ☁️
-          </button>
         </div>
       </div>
 
