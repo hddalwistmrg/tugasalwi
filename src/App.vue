@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import TaskList from "./components/TaskList.vue";
 import TaskModal from "./components/TaskModal.vue";
 import LucideIcon from "./components/LucideIcon.vue";
+import ThemeToggle from "./components/ThemeToggle.vue";
 import {
   initFirebase,
   loginWithGoogle,
@@ -29,8 +30,10 @@ function toggleTheme() {
 function applyTheme() {
   if (isDarkMode.value) {
     document.documentElement.setAttribute("data-theme", "dark");
+    document.body.setAttribute("data-dark-mode", "true");
   } else {
     document.documentElement.removeAttribute("data-theme");
+    document.body.setAttribute("data-dark-mode", "false");
   }
 }
 
@@ -44,9 +47,10 @@ const statusFilter = ref("All"); // All, Active, Done
 const selectedCategory = ref("All");
 const sortBy = ref("deadline"); // deadline, priority, newest
 
-// Modals
+// Modals & Menus
 const isTaskModalOpen = ref(false);
 const taskBeingEdited = ref(null);
+const isMobileMenuOpen = ref(false);
 
 // Firebase & User state
 const isCloudConnected = ref(true);
@@ -285,18 +289,42 @@ async function handleLogin() {
   }
 }
 
+// Desktop Profile Dropdown State
+const isProfileDropdownOpen = ref(false);
+
+function toggleProfileDropdown() {
+  isProfileDropdownOpen.value = !isProfileDropdownOpen.value;
+}
+
+function closeProfileDropdown() {
+  isProfileDropdownOpen.value = false;
+}
+
+function handleWindowClick(e) {
+  if (isProfileDropdownOpen.value) {
+    const dropdown = document.querySelector(".user-dropdown-container");
+    if (dropdown && !dropdown.contains(e.target)) {
+      isProfileDropdownOpen.value = false;
+    }
+  }
+}
+
 async function handleLogout() {
+  isProfileDropdownOpen.value = false;
+  isMobileMenuOpen.value = false;
   await logoutUser();
   currentUser.value = null;
   tasks.value = [];
 }
 
 onMounted(() => {
+  window.addEventListener("click", handleWindowClick);
   applyTheme();
   setupFirebase();
 });
 
 onUnmounted(() => {
+  window.removeEventListener("click", handleWindowClick);
   if (unsubscribeTasks) unsubscribeTasks();
   if (unsubscribeAuth) unsubscribeAuth();
 });
@@ -317,14 +345,12 @@ onUnmounted(() => {
             <span class="brand-name">TaskFlow</span>
           </div>
 
-          <button
-            class="icon-button"
-            @click="toggleTheme"
-            :title="isDarkMode ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'"
-          >
-            <LucideIcon v-if="isDarkMode" name="sun" size="18" />
-            <LucideIcon v-else name="moon" size="18" />
-          </button>
+          <!-- Pilot Bear Theme Switcher -->
+          <ThemeToggle
+            :model-value="isDarkMode"
+            @toggle="toggleTheme"
+            width="80px"
+          />
         </header>
 
         <div class="landing-hero-center">
@@ -341,13 +367,18 @@ onUnmounted(() => {
 
           <!-- Subtitle -->
           <p class="hero-main-desc">
-            Ruang kerja minimalis untuk mencatat tugas, mengatur prioritas, dan memantau tenggat waktu tanpa distraksi.
+            Ruang kerja minimalis untuk mencatat tugas, mengatur prioritas, dan
+            memantau tenggat waktu tanpa distraksi.
           </p>
 
-          <!-- Clean Primary CTA -->
+          <!-- CTA Buttons -->
           <div class="hero-cta-group">
-            <button class="btn-cta-primary" @click="handleLogin">
-              <svg class="google-icon-btn" viewBox="0 0 24 24">
+            <button
+              class="btn-cta-primary"
+              @click="handleLogin"
+              title="Masuk dengan akun Google"
+            >
+              <svg class="google-icon" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -366,7 +397,6 @@ onUnmounted(() => {
                 />
               </svg>
               <span>Masuk dengan Google</span>
-              <LucideIcon name="arrow-right" size="18" />
             </button>
           </div>
         </div>
@@ -374,7 +404,88 @@ onUnmounted(() => {
 
       <!-- 2. TAMPILAN JIKA SUDAH LOGIN (DASHBOARD LENGKAP) -->
       <section v-else class="dashboard">
-        <!-- Top Executive Bar with Brand, Theme, User Profile & Actions -->
+        <!-- Backdrop Mobile Drawer -->
+        <div
+          v-if="isMobileMenuOpen"
+          class="drawer-backdrop"
+          @click="isMobileMenuOpen = false"
+        ></div>
+
+        <!-- Mobile Drawer Navigation (Aside Menu yang slide dari kanan) -->
+        <nav class="mobile-drawer" :class="{ 'nav-active': isMobileMenuOpen }">
+          <div class="drawer-header">
+            <div class="drawer-user-info">
+              <img
+                v-if="currentUser.photoURL"
+                :src="currentUser.photoURL"
+                :alt="currentUser.displayName || 'User'"
+                class="drawer-avatar"
+              />
+              <div v-else class="drawer-avatar-placeholder">
+                <LucideIcon name="user" size="20" />
+              </div>
+              <div class="drawer-user-details">
+                <span class="drawer-user-name">{{
+                  currentUser.displayName || "Pengguna"
+                }}</span>
+                <span class="drawer-user-email">{{
+                  currentUser.email || "Akun Terhubung"
+                }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-divider"></div>
+
+          <div class="drawer-content">
+            <div class="drawer-nav-group">
+              <div class="drawer-item" @click="toggleTheme">
+                <div class="drawer-item-left">
+                  <span>{{ isDarkMode ? "Mode Gelap" : "Mode Terang" }}</span>
+                </div>
+                <div @click.stop>
+                  <ThemeToggle
+                    :model-value="isDarkMode"
+                    @toggle="toggleTheme"
+                    width="70px"
+                  />
+                </div>
+              </div>
+
+              <div class="drawer-item text-danger" @click="handleLogout">
+                <div class="drawer-item-left">
+                  <div class="drawer-item-icon icon-danger">
+                    <LucideIcon name="log-out" size="18" />
+                  </div>
+                  <span>Keluar Akun</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-footer">
+            <div class="drawer-brand-mini">
+              <div class="brand-icon-mini">
+                <LucideIcon name="check" size="13" stroke-width="3" />
+              </div>
+              <span class="drawer-brand-name">TaskFlow</span>
+            </div>
+            <p class="drawer-credit">
+              Dibuat oleh <strong>Haddad Alwi Situmorang</strong>
+            </p>
+            <a
+              href="https://instagram.com/hddalwistmrg"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="drawer-ig-link"
+            >
+              <LucideIcon name="instagram" size="15" />
+              <span>@hddalwistmrg</span>
+            </a>
+          </div>
+        </nav>
+
+        <!-- Top Executive Bar with Brand, Desktop Navigation, & Mobile Burger -->
         <section class="dashboard-topbar">
           <div class="brand">
             <div class="brand-icon">
@@ -383,102 +494,180 @@ onUnmounted(() => {
             <span class="brand-name">TaskFlow</span>
           </div>
 
-          <div class="dashboard-actions">
-            <!-- Theme Toggle -->
-            <button
-              class="icon-button"
-              @click="toggleTheme"
-              :title="isDarkMode ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'"
-            >
-              <LucideIcon v-if="isDarkMode" name="sun" size="17" />
-              <LucideIcon v-else name="moon" size="17" />
-            </button>
+          <!-- Desktop Navigation Actions (Otomatis disembunyikan di HP) -->
+          <div class="dashboard-actions desktop-nav">
+            <!-- Pilot Bear Theme Toggle -->
+            <ThemeToggle
+              :model-value="isDarkMode"
+              @toggle="toggleTheme"
+              width="76px"
+            />
 
-            <!-- User Badge -->
-            <div class="user-pill">
-              <img
-                v-if="currentUser.photoURL"
-                :src="currentUser.photoURL"
-                :alt="currentUser.displayName || 'User'"
-                class="user-avatar"
-              />
-              <div v-else class="user-avatar-placeholder">
-                <LucideIcon name="user" size="15" />
-              </div>
-              <span class="user-name">{{
-                currentUser.displayName?.split(" ")[0] || "Saya"
-              }}</span>
+            <!-- User Profile Dropdown (Hanya profil & nama yang tampil, klik untuk memunculkan tombol keluar) -->
+            <div class="user-dropdown-container">
+              <button
+                class="user-pill-btn"
+                :class="{ 'user-pill-active': isProfileDropdownOpen }"
+                @click.stop="toggleProfileDropdown"
+                type="button"
+                title="Menu Profil"
+              >
+                <img
+                  v-if="currentUser.photoURL"
+                  :src="currentUser.photoURL"
+                  :alt="currentUser.displayName || 'User'"
+                  class="user-avatar"
+                />
+                <div v-else class="user-avatar-placeholder">
+                  <LucideIcon name="user" size="15" />
+                </div>
+                <span class="user-name">{{
+                  currentUser.displayName?.split(" ")[0] || "Saya"
+                }}</span>
+                <LucideIcon
+                  name="chevron-down"
+                  size="14"
+                  class="dropdown-chevron"
+                  :class="{ 'chevron-rotated': isProfileDropdownOpen }"
+                />
+              </button>
+
+              <!-- Floating Dropdown Menu -->
+              <Transition name="dropdown-pop">
+                <div
+                  v-if="isProfileDropdownOpen"
+                  class="profile-dropdown-menu"
+                  @click.stop
+                >
+                  <div class="dropdown-user-header">
+                    <span class="dropdown-user-fullname">{{
+                      currentUser.displayName || "Pengguna"
+                    }}</span>
+                    <span class="dropdown-user-email">{{
+                      currentUser.email || ""
+                    }}</span>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <button
+                    class="dropdown-logout-item"
+                    @click="
+                      handleLogout();
+                      closeProfileDropdown();
+                    "
+                  >
+                    <LucideIcon name="log-out" size="16" />
+                    <span>Keluar</span>
+                  </button>
+                </div>
+              </Transition>
             </div>
-
-            <!-- Logout Button -->
-            <button
-              class="btn-logout"
-              @click="handleLogout"
-              title="Keluar akun"
-            >
-              <LucideIcon name="log-out" size="14" />
-              <span>Keluar</span>
-            </button>
-
-            <!-- Primary Create Button -->
-            <button class="btn-create-task" @click="openCreateModal">
-              <LucideIcon name="plus" size="18" />
-              <span>Tambah Tugas</span>
-            </button>
           </div>
+
+          <!-- Mobile Animated Burger (Hanya tampil di HP / tablet <= 825px) -->
+          <button
+            class="burger"
+            :class="{ 'toggle-burger': isMobileMenuOpen }"
+            @click="isMobileMenuOpen = !isMobileMenuOpen"
+            type="button"
+            aria-label="Menu navigasi"
+            :title="isMobileMenuOpen ? 'Tutup menu' : 'Buka menu'"
+          >
+            <span class="line line-1"></span>
+            <span class="line line-2"></span>
+            <span class="line line-3"></span>
+          </button>
         </section>
 
-        <!-- Greeting & Subtitle Summary -->
+        <!-- Greeting & Subtitle Summary (Desktop: Button Tambah Tugas sejajar dengan Halo, Haddad) -->
         <section class="dashboard-intro">
-          <h1 class="header-title">
-            Halo, {{ currentUser.displayName?.split(" ")[0] || "Saya" }}
-          </h1>
-          <p class="header-subtitle">
-            {{ activeCount > 0 ? `${activeCount} tugas aktif menunggu diselesaikan.` : 'Semua tugas telah selesai, kerja bagus!' }}
-          </p>
+          <div class="intro-left">
+            <h1 class="header-title">
+              Halo, {{ currentUser.displayName?.split(" ")[0] || "Saya" }}
+            </h1>
+            <p class="header-subtitle">
+              {{
+                activeCount > 0
+                  ? `${activeCount} tugas aktif menunggu diselesaikan.`
+                  : "Semua tugas telah selesai, kerja bagus!"
+              }}
+            </p>
+          </div>
+
+          <!-- Button Tambah Tugas Desktop (Sejajar dengan Halo, Haddad) -->
+          <button
+            class="btn-create-task desktop-create-btn"
+            @click="openCreateModal"
+          >
+            <LucideIcon name="plus" size="18" />
+            <span>Tambah Tugas</span>
+          </button>
         </section>
 
-        <!-- Executive Minimalist Metric Ribbon -->
-        <section class="stats-ribbon">
-          <div class="ribbon-col">
-            <span class="ribbon-label">Total Tugas</span>
-            <span class="ribbon-value">{{ totalCount }}</span>
-          </div>
+        <!-- Modern Dashboard Metric & Progress Card -->
+        <section class="dashboard-highlight-section">
+          <div class="card dashboard-stats-card">
+            <div class="card-body">
+              <!-- Metric Tiles -->
+              <div class="stats-mini-summary">
+                <div class="summary-stat-tag">
+                  <span class="stat-tag-num">{{ totalCount }}</span>
+                  <span class="stat-tag-lbl">Total Tugas</span>
+                </div>
+                <div class="summary-stat-tag">
+                  <div class="stat-dot-num">
+                    <span class="active-pulse-dot"></span>
+                    <span class="stat-tag-num text-cyan">{{
+                      activeCount
+                    }}</span>
+                  </div>
+                  <span class="stat-tag-lbl">Dalam Pengerjaan</span>
+                </div>
+                <div class="summary-stat-tag">
+                  <span class="stat-tag-num text-emerald">{{ doneCount }}</span>
+                  <span class="stat-tag-lbl">Selesai</span>
+                </div>
+                <div class="summary-stat-tag">
+                  <span
+                    :class="[
+                      'stat-tag-num',
+                      urgentCount > 0 ? 'text-amber' : 'text-muted',
+                    ]"
+                  >
+                    {{ urgentCount }}
+                  </span>
+                  <span class="stat-tag-lbl">Mendekati Deadline</span>
+                </div>
+              </div>
 
-          <div class="ribbon-divider"></div>
-
-          <div class="ribbon-col">
-            <div class="label-with-dot">
-              <span class="active-pulse-dot"></span>
-              <span class="ribbon-label">Dalam Pengerjaan</span>
+              <!-- Progress Bar -->
+              <div class="progress">
+                <div class="progress-labels">
+                  <span>Progress Keseluruhan</span>
+                  <span class="progress-percent-val"
+                    >{{ progressPercentage }}%</span
+                  >
+                </div>
+                <div class="progress-bar">
+                  <div
+                    class="progress-bar-fill"
+                    :style="{ width: progressPercentage + '%' }"
+                  ></div>
+                </div>
+              </div>
             </div>
-            <span class="ribbon-value text-teal">{{ activeCount }}</span>
-          </div>
-
-          <div class="ribbon-divider"></div>
-
-          <div class="ribbon-col">
-            <div class="label-with-percent">
-              <span class="ribbon-label">Selesai</span>
-              <span class="ribbon-percent">{{ progressPercentage }}%</span>
-            </div>
-            <div class="ribbon-progress-bar">
-              <div
-                class="ribbon-progress-fill"
-                :style="{ width: progressPercentage + '%' }"
-              ></div>
-            </div>
-          </div>
-
-          <div class="ribbon-divider"></div>
-
-          <div class="ribbon-col">
-            <span class="ribbon-label">Mendekati Deadline</span>
-            <span :class="['ribbon-value', urgentCount > 0 ? 'text-danger' : 'text-muted']">
-              {{ urgentCount }}
-            </span>
           </div>
         </section>
+
+        <!-- Mobile Create Task Button (Hanya tampil di HP, di bawah bagian jumlah tugas / di atas kolom pencarian) -->
+        <div class="mobile-action-bar">
+          <button
+            class="btn-create-task mobile-create-btn"
+            @click="openCreateModal"
+          >
+            <LucideIcon name="plus" size="18" />
+            <span>Tambah Tugas Baru</span>
+          </button>
+        </div>
 
         <!-- Filters, Search & View Controls (Integrated Toolbar) -->
         <section class="toolbar-section">
@@ -569,7 +758,8 @@ onUnmounted(() => {
               <span class="footer-brand-title">TaskFlow</span>
             </div>
             <p class="footer-description">
-              Sistem manajemen tugas harian yang minimalis dan teratur untuk meningkatkan fokus, ketenangan kerja, dan produktivitas Anda.
+              Sistem manajemen tugas harian yang minimalis dan teratur untuk
+              meningkatkan fokus, ketenangan kerja, dan produktivitas Anda.
             </p>
           </div>
 
@@ -590,9 +780,12 @@ onUnmounted(() => {
 
         <div class="footer-bottom-bar">
           <p class="footer-copyright">
-            &copy; {{ new Date().getFullYear() }} TaskFlow. Dibuat oleh <strong>Haddad Alwi Situmorang</strong>. All rights reserved.
+            &copy; {{ new Date().getFullYear() }} TaskFlow. Dibuat oleh
+            <strong>Haddad Alwi Situmorang</strong>. All rights reserved.
           </p>
-          <span class="footer-tagline">Fokus, tenang, dan selesaikan tepat waktu.</span>
+          <span class="footer-tagline"
+            >Fokus, tenang, dan selesaikan tepat waktu.</span
+          >
         </div>
       </div>
     </footer>
@@ -623,9 +816,40 @@ onUnmounted(() => {
   pointer-events: none;
   z-index: 0;
   background-image:
-    radial-gradient(circle at 18% 18%, rgba(16, 185, 129, 0.12) 0%, transparent 45%),
-    radial-gradient(circle at 82% 28%, rgba(6, 182, 212, 0.12) 0%, transparent 45%),
-    radial-gradient(circle at 50% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 55%);
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(16, 185, 129, 0.08) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 82% 28%,
+      rgba(6, 182, 212, 0.08) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 50% 85%,
+      rgba(99, 102, 241, 0.06) 0%,
+      transparent 55%
+    );
+}
+
+[data-theme="dark"] .app-layout::before {
+  background-image:
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(16, 185, 129, 0.13) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 82% 28%,
+      rgba(6, 182, 212, 0.13) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 50% 85%,
+      rgba(99, 102, 241, 0.09) 0%,
+      transparent 55%
+    );
 }
 
 /* Brand Component */
@@ -680,27 +904,42 @@ onUnmounted(() => {
   border-color: var(--border-focus);
 }
 
-/* User Pill & Info */
-.user-pill {
+/* User Profile Dropdown Container (Hanya profil & nama yang tampil secara default) */
+.user-dropdown-container {
+  position: relative;
+  z-index: 100;
+}
+
+.user-pill-btn {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   background: var(--bg-surface);
-  padding: 3px 10px 3px 4px;
+  padding: 3px 12px 3px 4px;
   border-radius: 9999px;
   border: 1px solid var(--border);
+  cursor: pointer;
+  box-shadow: var(--card-shadow);
+  transition: all 0.2s ease;
+}
+
+.user-pill-btn:hover,
+.user-pill-btn.user-pill-active {
+  border-color: var(--border-focus);
+  background: var(--bg-subtle);
+  transform: translateY(-1px);
 }
 
 .user-avatar {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .user-avatar-placeholder {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--primary-light);
   color: var(--primary);
@@ -710,28 +949,106 @@ onUnmounted(() => {
 }
 
 .user-name {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.86rem;
+  font-weight: 750;
   color: var(--text-primary);
 }
 
-.btn-logout {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: none;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.2s ease;
+.dropdown-chevron {
+  color: var(--text-muted);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: 2px;
 }
 
-.btn-logout:hover {
-  filter: brightness(0.9);
+.dropdown-chevron.chevron-rotated {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+/* Floating Dropdown Menu (Muncul saat profil diklik) */
+.profile-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 210px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 12px 32px -4px rgba(0, 0, 0, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 0.65rem;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-theme="dark"] .profile-dropdown-menu {
+  background: #141419;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
+}
+
+.dropdown-user-header {
+  padding: 0.35rem 0.5rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-user-fullname {
+  font-size: 0.88rem;
+  font-weight: 750;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.dropdown-user-email {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.3rem 0;
+}
+
+.dropdown-logout-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: #f43f5e;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdown-logout-item:hover {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+}
+
+/* Dropdown Animation */
+.dropdown-pop-enter-active,
+.dropdown-pop-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dropdown-pop-enter-from,
+.dropdown-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
 }
 
 /* Main Content */
@@ -849,11 +1166,43 @@ onUnmounted(() => {
   }
 }
 
+/* CTA Buttons on Landing Hero */
 .hero-cta-group {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
+}
+
+.btn-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 1rem;
+  font-weight: 750;
+  padding: 0.95rem 2rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 8px 25px -4px rgba(16, 185, 129, 0.45);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -4px rgba(16, 185, 129, 0.65);
+  filter: brightness(1.05);
+}
+
+.google-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: #ffffff;
+  padding: 2px;
+  border-radius: 50%;
 }
 
 @media (max-width: 480px) {
@@ -875,95 +1224,260 @@ onUnmounted(() => {
   margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--border);
   gap: 1rem;
+  position: relative;
 }
 
 .dashboard-actions {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  flex-wrap: wrap;
 }
 
-@media (max-width: 640px) {
-  .dashboard-topbar {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 1rem;
-    margin-bottom: 1.25rem;
-    gap: 0.75rem;
-  }
-  .dashboard-actions {
-    display: contents;
-  }
-  .dashboard-actions .icon-button {
-    order: 2;
-  }
-  .dashboard-actions .user-pill {
-    order: 3;
-    max-width: 120px;
-  }
-  .dashboard-actions .user-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .dashboard-actions .btn-logout {
-    order: 4;
-  }
-  .dashboard-actions .btn-create-task {
-    order: 5;
-    width: 100%;
-    justify-content: center;
-    padding: 0.75rem 1rem;
-    font-size: 0.92rem;
-  }
-}
-
-.dashboard-intro {
-  margin-bottom: 1.75rem;
-}
-
-@media (max-width: 480px) {
-  .dashboard-intro {
-    margin-bottom: 1.25rem;
-  }
-}
-
-.btn-cta-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
-  color: #ffffff;
+/* Hamburger Menu Button */
+.burger {
+  display: none;
+  cursor: pointer;
+  width: 28px;
+  height: 20px;
+  position: relative;
+  z-index: 1001;
+  flex-direction: column;
+  justify-content: space-between;
+  background: transparent;
   border: none;
+  padding: 0;
+}
+
+.burger .line {
+  width: 100%;
+  height: 2.5px;
+  background-color: var(--text-primary);
+  border-radius: 4px;
+  transition: all 0.3s ease-in-out;
+}
+
+.toggle-burger .line-1 {
+  transform: rotate(-45deg) translate(-5px, 7px);
+}
+
+.toggle-burger .line-2 {
+  opacity: 0;
+  transform: translateX(4px);
+}
+
+.toggle-burger .line-3 {
+  transform: rotate(45deg) translate(-5px, -7px);
+}
+
+/* Mobile Aside Drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 998;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.mobile-drawer {
+  position: fixed;
+  width: 78%;
+  max-width: 320px;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface-elevated);
+  border-left: 1px solid var(--border);
+  z-index: 999;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4.5rem 1.25rem 2rem;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-drawer.nav-active {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  margin-bottom: 1.25rem;
+}
+
+.drawer-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.drawer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+}
+
+.drawer-avatar-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-user-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-user-name {
   font-size: 0.98rem;
   font-weight: 750;
-  padding: 0.95rem 1.95rem;
-  border-radius: 9999px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-user-email {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-divider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.drawer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
   cursor: pointer;
-  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.45);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--text-primary);
 }
 
-.btn-cta-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px -4px rgba(16, 185, 129, 0.6);
-  filter: brightness(1.05);
+.drawer-item:hover {
+  background: var(--primary-light);
+  border-color: var(--border-focus);
 }
 
-/* 2. Dashboard */
-.dashboard-header {
+.drawer-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.drawer-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.drawer-item.text-danger {
+  color: var(--danger);
+}
+
+.drawer-item.text-danger .drawer-item-icon {
+  color: var(--danger);
+}
+
+.drawer-item.text-danger:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+.drawer-badge-theme {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.drawer-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.drawer-brand-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawer-brand-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.drawer-credit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.drawer-credit strong {
+  color: var(--text-primary);
+}
+
+.drawer-ig-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e1306c;
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+/* Dashboard Intro with Desktop Button */
+.dashboard-intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1.75rem;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 1.25rem;
 }
 
-.header-intro {
+.intro-left {
   display: flex;
   flex-direction: column;
 }
@@ -996,6 +1510,7 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   transition: all 0.25s ease;
+  white-space: nowrap;
 }
 
 .btn-create-task:hover {
@@ -1004,141 +1519,254 @@ onUnmounted(() => {
   filter: brightness(1.05);
 }
 
-/* Executive Minimalist Stats Ribbon */
-.stats-ribbon {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.1rem 1.6rem;
-  box-shadow: var(--card-shadow);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1.2fr auto 1fr;
-  align-items: center;
-  gap: 1.25rem;
+/* Mobile Action Bar */
+.mobile-action-bar {
+  display: none;
+  margin-bottom: 1.5rem;
+}
+
+/* Modern Dashboard Metric & Progress Card (Dark, Sleek, Tanpa Outline Bersinar) */
+.dashboard-highlight-section {
+  width: 100%;
   margin-bottom: 1.75rem;
+  display: flex;
+  justify-content: center;
 }
 
-@media (max-width: 820px) {
-  .stats-ribbon {
-    grid-template-columns: 1fr 1fr;
-    gap: 1.1rem;
-    padding: 1.15rem;
-  }
-  .ribbon-divider {
-    display: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .stats-ribbon {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.85rem;
-    padding: 0.95rem;
-    border-radius: var(--radius-md);
-    margin-bottom: 1.25rem;
-  }
-}
-
-.ribbon-col {
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: space-between;
+  text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.ribbon-divider {
-  width: 1px;
-  height: 38px;
-  background: var(--border);
+[data-theme="dark"] .card {
+  background: #141419;
+  border: 1px solid rgba(255, 255, 255, 0.08); /* Outline gelap matte, subtle & tanpa sinar */
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
 
-.ribbon-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.card:hover {
+  transform: translateY(-2px);
 }
 
-@media (max-width: 480px) {
-  .ribbon-label {
-    font-size: 0.68rem;
-  }
+[data-theme="dark"] .card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
-.ribbon-value {
-  font-size: 1.55rem;
-  font-weight: 850;
-  line-height: 1;
-  color: var(--text-primary);
-  letter-spacing: -0.03em;
+[data-theme="light"] .card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
-@media (max-width: 480px) {
-  .ribbon-value {
-    font-size: 1.35rem;
-  }
+.card-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1.6rem;
+  text-align: left;
 }
 
-.text-teal {
-  color: #0d9488;
+.stats-mini-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
-[data-theme="dark"] .text-teal {
-  color: #2dd4bf;
+.summary-stat-tag {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0.85rem 1.15rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
 }
 
-.text-danger {
-  color: #ef4444;
+[data-theme="light"] .summary-stat-tag {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
 }
 
-.text-muted {
-  color: var(--text-muted);
-}
-
-.label-with-dot {
+.stat-dot-num {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .active-pulse-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #0d9488;
-  box-shadow: 0 0 6px #0d9488;
+  background: #06b6d4;
+  box-shadow: 0 0 6px #06b6d4;
+  flex-shrink: 0;
 }
 
-[data-theme="dark"] .active-pulse-dot {
-  background: #2dd4bf;
-  box-shadow: 0 0 8px #2dd4bf;
+.stat-tag-num {
+  font-size: 1.55rem;
+  font-weight: 850;
+  color: var(--text-primary);
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
-.label-with-percent {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+[data-theme="dark"] .stat-tag-num {
+  color: #f8fafc;
 }
 
-.ribbon-percent {
-  font-size: 0.8rem;
-  font-weight: 750;
+.stat-tag-num.text-cyan {
+  color: #06b6d4;
+}
+
+.stat-tag-num.text-emerald {
   color: #10b981;
 }
 
-.ribbon-progress-bar {
-  height: 6px;
-  background: var(--bg-subtle);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-top: 4px;
+.stat-tag-num.text-amber {
+  color: #f43f5e;
 }
 
-.ribbon-progress-fill {
+.stat-tag-num.text-muted {
+  color: var(--text-muted);
+}
+
+.stat-tag-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .stat-tag-lbl {
+  color: #64748b;
+}
+
+.card-body .progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.progress-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.progress-percent-val {
+  color: #10b981;
+  font-weight: 750;
+}
+
+.card-body .progress-bar {
+  position: relative;
+  width: 100%;
+  background: var(--bg-subtle);
+  height: 0.45rem;
+  display: block;
+  border-radius: 3.125rem;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .card-body .progress-bar {
+  background: #232228ff;
+}
+
+.card-body .progress-bar .progress-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
   height: 100%;
+  border-radius: 3.125rem;
   background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
-  border-radius: 9999px;
   transition: width 0.4s ease;
+}
+
+/* Responsive Breakpoints (Mobile & Tablet <= 825px) */
+@media (max-width: 825px) {
+  /* Hide Desktop Nav in Topbar & Show Animated Burger */
+  .desktop-nav {
+    display: none !important;
+  }
+
+  .burger {
+    display: flex;
+  }
+
+  .dashboard-topbar {
+    padding-bottom: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Desktop Create Button Hidden on Mobile */
+  .desktop-create-btn {
+    display: none !important;
+  }
+
+  /* Mobile Create Button shown under Stats and above Search */
+  .mobile-action-bar {
+    display: block;
+  }
+
+  .mobile-create-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.85rem 1.25rem;
+    font-size: 0.95rem;
+    box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.45);
+  }
+
+  /* Card di HP: Tetap rapi, responsif, dan proporsional */
+  .dashboard-highlight-section {
+    margin-bottom: 1.25rem;
+  }
+
+  .card {
+    border-radius: var(--radius-lg);
+  }
+
+  .card-body {
+    padding: 0.85rem 1rem;
+  }
+
+  .stats-mini-summary {
+    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 0.85rem;
+  }
+
+  .summary-stat-tag {
+    padding: 0.65rem 0.85rem;
+  }
+
+  .stat-tag-num {
+    font-size: 1.35rem;
+  }
+
+  .stat-tag-lbl {
+    font-size: 0.68rem;
+  }
 }
 
 /* Integrated Toolbar Section */
