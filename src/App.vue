@@ -1074,7 +1074,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding-bottom: 3.5rem;
+  padding-bottom: 7rem;
+}
+
+@media (max-width: 640px) {
+  .login-landing {
+    padding-bottom: 4.5rem;
+  }
 }
 
 .landing-topbar {
@@ -1172,6 +1178,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: 100%;
+  margin-bottom: 3.5rem;
+}
+
+@media (max-width: 640px) {
+  .hero-cta-group {
+    margin-bottom: 2rem;
+  }
 }
 
 .btn-cta-primary {
@@ -1956,14 +1969,14 @@ onUnmounted(() => {
   margin-top: auto;
   border-top: 1px solid var(--border);
   background: transparent;
-  padding: 3rem 1.5rem 2.5rem;
+  padding: 4.5rem 1.5rem 3rem;
   position: relative;
   z-index: 1;
 }
 
 @media (max-width: 640px) {
   .app-footer {
-    padding: 2.25rem 1rem 2rem;
+    padding: 3rem 1rem 2.25rem;
   }
 }
 
